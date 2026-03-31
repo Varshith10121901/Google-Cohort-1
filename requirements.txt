@@ -1,0 +1,11 @@
+# TASK: Project 1, 2, 3 (AURA Lite Core, MCP Integration & AlloyDB)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+google-adk>=0.3.0
+google-genai>=1.0.0
+litellm>=1.50.0
+python-dotenv>=1.0.0
+httpx>=0.20.0
+psycopg2-binary>=2.9.0

@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURA Lite — AI Agriculture Platform</title>
+
+<!-- Data URI SVG Favicon -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36' fill='none'%3E%3Cdefs%3E%3ClinearGradient id='lg1' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%2338bdf8'/%3E%3Cstop offset='100%25' stop-color='%2367e8f9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpolygon points='18,3 33,12 33,24 18,33 3,24 3,12' fill='none' stroke='url(%23lg1)' stroke-width='2'/%3E%3Cpolygon points='18,9 27,14.5 27,21.5 18,27 9,21.5 9,14.5' fill='url(%23lg1)' opacity='0.15'/%3E%3Ccircle cx='18' cy='18' r='4' fill='url(%23lg1)'/%3E%3C/svg%3E">
+
+<style>
+/* ─── DESIGN TOKENS ─────────────────────────────────────────────── */
+:root {
+  --bg:          #070c14;
+  --bg-2:        #0d1424;
+  --bg-3:        #111d2e;
+  --surface:     rgba(16, 26, 44, 0.85);
+  --border:      rgba(56, 189, 248, 0.12);
+  --border-hover:rgba(56, 189, 248, 0.35);
+  --primary:     #38bdf8;
+  --primary-dim: rgba(56, 189, 248, 0.18);
+  --primary-glow:rgba(56, 189, 248, 0.35);
+  --accent:      #0ea5e9;
+  --cyan:        #67e8f9;
+  --green:       #34d399;
+  --amber:       #fbbf24;
+  --text:        #e8f4fd;
+  --muted:       #64748b;
+  --muted-2:     #94a3b8;
+  --success:     #10b981;
+  --error:       #f87171;
+  --sidebar-w:   260px;
+  --sidebar-c:   84px;
+  --radius:      14px;
+  --transition:  0.35s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* ─── RESET ─────────────────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html { font-size: 16px; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  overflow-x: hidden;
+  /* Static radial bg — no animation, no cost */
+  background-image:
+    radial-gradient(ellipse 60% 40% at 10% 60%, rgba(14,165,233,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 35% at 90% 20%, rgba(103,232,249,0.05) 0%, transparent 70%);
+}
+
+/* ─── INTRO SCREEN ───────────────────────────────────────────────── */
+#intro {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  z-index: 9999;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px;
+  /* Only opacity transition — GPU composited */
+  transition: opacity 0.7s ease, visibility 0.7s ease;
+}
+#intro.out { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.intro-wordmark {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: clamp(3rem, 8vw, 5.5rem);
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  background: linear-gradient(100deg, #fff 30%, var(--cyan) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  /* Only transform + opacity — GPU only */
+  animation: wordmarkIn 1s cubic-bezier(0.16,1,0.3,1) forwards;
+}
+.intro-sub {
+  font-size: 0.85rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0;
+  animation: fadeUp 0.6s ease 0.9s forwards;
+}
+.intro-bar {
+  width: 160px; height: 2px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 8px;
+  opacity: 0;
+  animation: fadeUp 0.4s ease 1s forwards;
+}
+.intro-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--cyan));
+  animation: barFill 1.4s ease 1.1s forwards;
+  width: 0%;
+}
+
+@keyframes wordmarkIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.94); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes barFill {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+/* ─── PAGE CURTAIN ───────────────────────────────────────────────── */
+#curtain {
+  position: fixed; inset: 0;
+  z-index: 8000;
+  pointer-events: none;
+  /* Dark overlay — opacity only, GPU composited */
+  background: var(--bg);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+#curtain.in  { opacity: 0.7; pointer-events: all; }
+#curtain.out { opacity: 0;   pointer-events: none; }
+
+/* ─── LAYOUT ─────────────────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 24px 14px;
+  gap: 4px;
+  position: sticky; top: 0;
+  height: 100vh;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width var(--transition), transform var(--transition);
+  will-change: width, transform;
+  z-index: 200;
+}
+.sidebar.collapsed { width: var(--sidebar-c); }
+
+/* ── Logo: always visible, shrinks gracefully when collapsed ── */
+.sidebar-logo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 6px 24px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: padding var(--transition), justify-content var(--transition);
+}
+.sidebar.collapsed .sidebar-logo {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 20px;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  overflow: visible;
+}
+
+.sidebar-logo-icon { width: 34px; height: 34px; flex-shrink: 0; }
+
+/* Full logo text — always rendered, fades + shrinks when collapsed */
+.sidebar-logo-text {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1.15rem; font-weight: 800;
+  letter-spacing: 0.08em;
+  background: linear-gradient(120deg, #fff, var(--cyan));
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  transition: opacity var(--transition), font-size var(--transition), letter-spacing var(--transition);
+  white-space: nowrap;
+}
+/* When collapsed — show tiny text below icon */
+.sidebar.collapsed .sidebar-logo-text {
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+  text-align: center;
+  width: 100%;
+  overflow: visible;
+  padding: 0 4px;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted-2);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.9rem; font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap; overflow: hidden;
+  text-align: left; width: 100%;
+  transition: background var(--transition), color var(--transition),
+              border-color var(--transition), transform 0.2s ease;
+  will-change: transform;
+}
+.nav-item:hover {
+  background: var(--primary-dim);
+  color: var(--text);
+  border-color: var(--border);
+  transform: translateX(4px);
+}
+.nav-item.active {
+  background: var(--primary-dim);
+  border-color: var(--border-hover);
+  color: var(--primary);
+}
+.nav-item svg { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; min-width: 20px; }
+.nav-label {
+  transition: opacity var(--transition), max-width var(--transition);
+  max-width: 200px; overflow: hidden;
+}
+.sidebar.collapsed .nav-label { opacity: 0; max-width: 0; }
+/* Icons always fully visible when collapsed */
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 11px 0;
+  overflow: visible;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.sidebar-spacer { flex: 1; }
+
+.sidebar-toggle {
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+  width: 100%;
+}
+.sidebar-toggle:hover { background: var(--primary-dim); color: var(--primary); }
+.sidebar-toggle svg { width: 20px; height: 20px; fill: currentColor; }
+
+/* ─── MOBILE TOPBAR ──────────────────────────────────────────────── */
+.topbar {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0;
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  padding: 0 16px;
+  gap: 12px;
+  z-index: 300;
+}
+.topbar-logo {
+  display: flex; align-items: center; gap: 10px; flex: 1;
+}
+.topbar-logo-text {
+  font-size: 1.1rem; font-weight: 800; letter-spacing: 0.06em;
+  background: linear-gradient(120deg, #fff, var(--cyan));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.topbar-hamburger {
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--primary-dim);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer; color: var(--primary);
+}
+.topbar-hamburger svg { width: 20px; height: 20px; fill: currentColor; }
+
+/* Mobile drawer overlay */
+.drawer-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(7,12,20,0.7);
+  z-index: 250;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.drawer-overlay.show { opacity: 1; }
+
+/* ─── MOBILE BOTTOM NAV ──────────────────────────────────────────── */
+.bottom-nav {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  height: 62px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  align-items: center;
+  justify-content: space-around;
+  z-index: 300;
+  padding: 0 8px;
+}
+.bnav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: none; background: transparent;
+  color: var(--muted);
+  font-size: 0.65rem; font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+  flex: 1;
+}
+.bnav-item svg { width: 20px; height: 20px; fill: currentColor; }
+.bnav-item.active { color: var(--primary); background: var(--primary-dim); }
+.bnav-item:hover  { color: var(--text); }
+
+/* ─── RESPONSIVE ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Sidebar becomes a hidden off-screen drawer — never display:none */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    width: 260px !important;
+    transform: translateX(-100%); /* hidden off-screen */
+    z-index: 260;
+    transition: transform var(--transition);
+  }
+  /* Open state — slides in */
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  .topbar  { display: flex; }
+  .bottom-nav { display: flex; }
+
+  /* Push content below topbar + above bottom nav */
+  .main { padding-top: 56px; padding-bottom: 62px; }
+
+  .drawer-overlay { display: block; pointer-events: none; }
+  .drawer-overlay.show { pointer-events: all; }
+
+  /* Page padding for mobile */
+  .page-inner { padding: 1.5rem 1rem; }
+
+  /* Hero adjustments */
+  #overview { padding: 2rem 1rem; }
+  .hero-title { font-size: 2rem; }
+  .hero-desc  { font-size: 0.97rem; }
+  .hero-actions { flex-direction: column; align-items: stretch; }
+  .hero-actions .btn { width: 100%; justify-content: center; }
+  .hero-stats { gap: 1.5rem; }
+
+  /* Cards single column */
+  .grid { grid-template-columns: 1fr; }
+
+  /* Form card full width */
+  .form-card { max-width: 100%; }
+
+  /* Architecture SVG horizontal scroll */
+  .arch-wrap { padding: 1.2rem; overflow-x: auto; }
+  .diagram-svg { min-width: 600px; }
+
+  /* Tables scroll */
+  table { display: block; overflow-x: auto; }
+
+  /* Buttons full width on mobile */
+  .btn { width: 100%; justify-content: center; }
+
+  /* Result box */
+  .result-box { padding: 1.2rem; }
+}
+
+@media (max-width: 480px) {
+  .hero-title { font-size: 1.7rem; }
+  .page-header h1 { font-size: 1.5rem; }
+  .arch-title { font-size: 1.1rem; }
+  .stat-n { font-size: 1.5rem; }
+}
+
+/* ─── MAIN ───────────────────────────────────────────────────────── */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* ─── PAGES ──────────────────────────────────────────────────────── */
+.page {
+  display: none;
+  flex: 1;
+  opacity: 0;
+  /* transform + opacity only — GPU composited, zero repaint */
+  will-change: transform, opacity;
+}
+.page.active {
+  display: flex; flex-direction: column;
+  animation: pageIn 0.45s cubic-bezier(0.16,1,0.3,1) forwards;
+}
+.page.leaving {
+  animation: pageOut 0.22s ease forwards;
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes pageOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-12px); }
+}
+
+/* ─── OVERVIEW ───────────────────────────────────────────────────── */
+#overview {
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 2rem;
+  position: relative;
+}
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--primary-dim);
+  border: 1px solid var(--border-hover);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin-bottom: 2rem;
+}
+.hero-badge span { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); display: block; }
+
+.hero-title {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: clamp(2.5rem, 5vw, 4.2rem);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  background: linear-gradient(120deg, #fff 40%, var(--cyan) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+  margin-bottom: 1.5rem;
+  max-width: 720px;
+}
+.hero-desc {
+  color: var(--muted-2);
+  font-size: 1.1rem;
+  line-height: 1.8;
+  max-width: 620px;
+  margin-bottom: 3rem;
+}
+.hero-actions {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hero-stats {
+  display: flex; gap: 3rem; margin-top: 4rem;
+  flex-wrap: wrap; justify-content: center;
+}
+.stat { text-align: center; }
+.stat-n {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 2rem; font-weight: 800;
+  color: var(--primary);
+}
+.stat-l { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+/* ─── PAGE INNER ─────────────────────────────────────────────────── */
+.page-inner { padding: 2.5rem 3rem; flex: 1; }
+
+.page-header { margin-bottom: 2.5rem; }
+.page-header h1 {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 2rem; font-weight: 800;
+  background: linear-gradient(120deg, #fff, var(--muted-2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  letter-spacing: -0.02em; margin-bottom: 0.5rem;
+}
+.page-header p { color: var(--muted); font-size: 1rem; line-height: 1.6; }
+
+/* ─── CARDS ──────────────────────────────────────────────────────── */
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.8rem;
+  /* NO backdrop-filter — too expensive on multiple elements */
+  /* transform + border-color only on hover */
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1), border-color 0.3s ease;
+  will-change: transform;
+  cursor: pointer;
+}
+.card:hover {
+  transform: translateY(-6px);
+  border-color: var(--border-hover);
+}
+
+.card-chip {
+  width: 44px; height: 44px;
+  background: var(--primary-dim);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--primary);
+  margin-bottom: 1.2rem;
+}
+.card-chip svg { width: 22px; height: 22px; fill: currentColor; }
+
+.card h3 {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1.15rem; font-weight: 700;
+  margin-bottom: 0.6rem; color: var(--text);
+}
+.card p { color: var(--muted); font-size: 0.95rem; line-height: 1.65; }
+
+/* Track badge */
+.track-tag {
+  display: inline-block;
+  font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px;
+  margin-bottom: 1rem;
+}
+.tag-blue  { background: rgba(56,189,248,0.12); color: var(--primary); border: 1px solid rgba(56,189,248,0.25); }
+.tag-green { background: rgba(52,211,153,0.12); color: var(--green);   border: 1px solid rgba(52,211,153,0.25); }
+.tag-amber { background: rgba(251,191,36,0.12);  color: var(--amber);   border: 1px solid rgba(251,191,36,0.25); }
+
+/* ─── ARCHITECTURE ───────────────────────────────────────────────── */
+.arch-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2.5rem;
+  width: 100%;
+}
+.arch-title {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 1.4rem; font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+.arch-sub { color: var(--accent); font-size: 0.8rem; letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1.5rem; }
+
+.diagram-svg { width: 100%; height: auto; }
+
+.node-box {
+  fill: var(--bg-3);
+  stroke: rgba(56,189,248,0.4);
+  stroke-width: 1.5;
+}
+.node-text  { fill: var(--text);    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-weight: 600; font-size: 14px; }
+.node-sub   { fill: var(--muted-2); font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; }
+
+.flow-line  { fill: none; stroke: #334155; stroke-width: 2; stroke-linecap: round; }
+.flow-anim  {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 6 10;
+  /* Dash animation — only stroke-dashoffset, GPU composited */
+  animation: dashFlow 1.4s linear infinite;
+}
+.flow-anim-g { stroke: var(--green); }
+.flow-anim-a { stroke: var(--amber); }
+
+@keyframes dashFlow {
+  from { stroke-dashoffset: 32; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ─── TRACK FORMS ────────────────────────────────────────────────── */
+.form-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem;
+  max-width: 760px;
+}
+
+.field { margin-bottom: 1.5rem; }
+.field label {
+  display: block;
+  font-weight: 600; font-size: 0.88rem;
+  letter-spacing: 0.05em;
+  color: var(--muted-2);
+  margin-bottom: 0.6rem;
+  text-transform: uppercase;
+}
+textarea, input[type="text"] {
+  width: 100%;
+  padding: 1rem 1.1rem;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.97rem;
+  color: var(--text);
+  /* Only border-color + box-shadow on focus */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  resize: vertical;
+}
+textarea::placeholder, input::placeholder { color: var(--muted); }
+textarea:focus, input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(14,165,233,0.12);
+}
+
+/* ─── BUTTONS ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 0.9rem 2rem;
+  border-radius: var(--radius);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 0.95rem; font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border: none;
+  /* transform only */
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  will-change: transform;
+}
+.btn svg { width: 18px; height: 18px; fill: currentColor; }
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, #0284c7 100%);
+  color: #fff;
+  box-shadow: 0 4px 18px rgba(14,165,233,0.2);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(14,165,233,0.32); }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border-hover);
+  color: var(--primary);
+}
+.btn-ghost:hover { transform: translateY(-2px); background: var(--primary-dim); }
+
+/* ─── LOADER ─────────────────────────────────────────────────────── */
+.loader {
+  display: none;
+  align-items: center; justify-content: center; gap: 8px;
+  padding: 2rem 0;
+}
+.loader.show { display: flex; }
+.loader-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  /* Scale only — GPU */
+  animation: dotBounce 0.9s ease-in-out infinite;
+}
+.loader-dot:nth-child(2) { animation-delay: 0.15s; background: var(--cyan); }
+.loader-dot:nth-child(3) { animation-delay: 0.3s;  background: var(--accent); }
+
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40%           { transform: scale(1.2); opacity: 1; }
+}
+
+/* ─── RESULT BOX ─────────────────────────────────────────────────── */
+.result-box {
+  display: none;
+  margin-top: 1.5rem;
+  padding: 1.5rem 1.8rem;
+  background: var(--bg-2);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  line-height: 1.7;
+  font-size: 0.97rem;
+  /* Only opacity + transform on appear */
+  animation: resultIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards;
+}
+.result-box.show { display: block; }
+.result-box strong { color: var(--primary); }
+
+@keyframes resultIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ─── TABLES ─────────────────────────────────────────────────────── */
+table {
+  width: 100%; border-collapse: separate; border-spacing: 0;
+  margin-top: 1.2rem; border-radius: 10px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.04); }
+th { background: rgba(14,165,233,0.08); color: var(--primary); font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; }
+tr:last-child td { border-bottom: none; }
+
+/* ─── SQL BOX ────────────────────────────────────────────────────── */
+.sql-block {
+  background: #0d1117;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 1.2rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  color: #7dd3fc;
+}
+.sql-comment { color: #4b5563; }
+
+.ai-disclaimer {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--muted);
+  padding: 1rem;
+  margin-top: auto;
+  opacity: 0.8;
+}
+
+/* ─── SCROLLBAR ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
+</style>
+</head>
+<body>
+
+<!-- MOBILE TOPBAR -->
+<div class="topbar" id="topbar">
+  <button class="topbar-hamburger" onclick="openDrawer()" title="Open Navigation Menu">
+    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+  </button>
+  <div class="topbar-logo" title="AURA Lite">
+    <svg width="26" height="26" viewBox="0 0 36 36" fill="none">
+      <defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#38bdf8"/><stop offset="100%" stop-color="#67e8f9"/>
+      </linearGradient></defs>
+      <polygon points="18,3 33,12 33,24 18,33 3,24 3,12" fill="none" stroke="url(#lg2)" stroke-width="2"/>
+      <circle cx="18" cy="18" r="4" fill="url(#lg2)"/>
+    </svg>
+    <span class="topbar-logo-text">AURA Lite</span>
+  </div>
+</div>
+
+<!-- DRAWER OVERLAY -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- MOBILE BOTTOM NAV -->
+<div class="bottom-nav">
+  <button class="bnav-item active" id="bn-overview" onclick="switchPage('overview')" title="Home">
+    <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+    Home
+  </button>
+  <button class="bnav-item" id="bn-projects" onclick="switchPage('projects')" title="Project Modules">
+    <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/></svg>
+    Modules
+  </button>
+  <button class="bnav-item" id="bn-architecture" onclick="switchPage('architecture')" title="Architecture Diagram">
+    <svg viewBox="0 0 24 24"><path d="M19.3 16.9c.4-.7.7-1.5.7-2.4 0-2.5-2-4.5-4.5-4.5S11 12 11 14.5c0 .9.3 1.7.7 2.4H4c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v9.9h-2.7z"/></svg>
+    Arch
+  </button>
+  <button class="bnav-item" id="bn-track1" onclick="switchPage('track1')" title="Track 1: Summarize">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm-3 14H8v-2h3v2zm3-4H8v-2h6v2zm0-4h-5V3.5L18.5 9H13z"/></svg>
+    T1
+  </button>
+  <button class="bnav-item" id="bn-track2" onclick="switchPage('track2')" title="Track 2: Crop Advisory">
+    <svg viewBox="0 0 24 24"><path d="M17 5.92L9 2v18H7v-1.73c-1.79.35-3 .99-3 1.73 0 1.1 2.69 2 6 2s6-.9 6-2c0-.99-2.16-1.81-5-1.97V8.98l6-3.06z"/></svg>
+    T2
+  </button>
+  <button class="bnav-item" id="bn-track3" onclick="switchPage('track3')" title="Track 3: Database Search">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 4.24 2 7v10c0 2.76 4.48 5 10 5s10-2.24 10-5V7c0-2.76-4.48-5-10-5zm0 3c4.14 0 7.5 1.34 7.5 3S16.14 11 12 11 4.5 9.34 4.5 8 7.86 5 12 5zm0 15c-4.14 0-7.5-1.34-7.5-3v-2.46C6.56 16.04 9.15 17 12 17s5.44-.96 7.5-2.46V17c0 1.66-3.36 3-7.5 3z"/></svg>
+    T3
+  </button>
+  <button class="bnav-item" id="bn-about" onclick="switchPage('about')" title="About Us">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    About
+  </button>
+</div>
+
+<!-- INTRO -->
+<div id="intro">
+  <div class="intro-wordmark">AURA LITE</div>
+  <div class="intro-sub">AI Intelligence Network</div>
+  <div class="intro-bar"><div class="intro-bar-fill"></div></div>
+</div>
+
+<!-- CURTAIN (opacity-only overlay) -->
+<div id="curtain"></div>
+
+<!-- SIDEBAR -->
+<nav class="sidebar collapsed" id="sidebar">
+  <div class="sidebar-logo">
+    <svg class="sidebar-logo-icon" viewBox="0 0 36 36" fill="none">
+      <defs>
+        <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#38bdf8"/>
+          <stop offset="100%" stop-color="#67e8f9"/>
+        </linearGradient>
+      </defs>
+      <polygon points="18,3 33,12 33,24 18,33 3,24 3,12" fill="none" stroke="url(#lg1)" stroke-width="2"/>
+      <polygon points="18,9 27,14.5 27,21.5 18,27 9,21.5 9,14.5" fill="url(#lg1)" opacity="0.15"/>
+      <circle cx="18" cy="18" r="4" fill="url(#lg1)"/>
+    </svg>
+    <span class="sidebar-logo-text">AURA Lite</span>
+  </div>
+
+  <button class="nav-item active" onclick="switchPage('overview')" title="Overview">
+    <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+    <span class="nav-label">Overview</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('projects')" title="Project Modules">
+    <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/></svg>
+    <span class="nav-label">Project Modules</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('architecture')" title="Architecture">
+    <svg viewBox="0 0 24 24"><path d="M19.3 16.9c.4-.7.7-1.5.7-2.4 0-2.5-2-4.5-4.5-4.5S11 12 11 14.5c0 .9.3 1.7.7 2.4H4c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v9.9h-2.7zM4 5v9h7.4c.6-1.5 2-2.6 3.8-2.9V5H4zm11.5 7c1.4 0 2.5 1.1 2.5 2.5s-1.1 2.5-2.5 2.5-2.5-1.1-2.5-2.5 1.1-2.5 2.5-2.5z"/></svg>
+    <span class="nav-label">Architecture</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('track1')" title="Track 1: Summarize">
+    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+    <span class="nav-label">Track 1: Summarize</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('track2')" title="Track 2: Crops">
+    <svg viewBox="0 0 24 24"><path d="M17 5.92L9 2v18H7v-1.73c-1.79.35-3 .99-3 1.73 0 1.1 2.69 2 6 2s6-.9 6-2c0-.99-2.16-1.81-5-1.97V8.98l6-3.06z"/></svg>
+    <span class="nav-label">Track 2: Crops</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('track3')" title="Track 3: Database">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 4.24 2 7v10c0 2.76 4.48 5 10 5s10-2.24 10-5V7c0-2.76-4.48-5-10-5zm0 3c4.14 0 7.5 1.34 7.5 3S16.14 11 12 11 4.5 9.34 4.5 8 7.86 5 12 5zm0 15c-4.14 0-7.5-1.34-7.5-3v-2.46C6.56 16.04 9.15 17 12 17s5.44-.96 7.5-2.46V17c0 1.66-3.36 3-7.5 3z"/></svg>
+    <span class="nav-label">Track 3: Database</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('about')" title="About Us">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+    <span class="nav-label">About Us</span>
+  </button>
+
+  <div class="sidebar-spacer"></div>
+
+  <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">
+    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+  </button>
+</nav>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- OVERVIEW -->
+  <div id="overview" class="page active">
+    <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:3rem 2rem;">
+      <div class="hero-badge"><span></span>Premium Agricultural AI</div>
+      <h1 class="hero-title">Unified AI Intelligence<br>for Indian Agriculture</h1>
+      <p class="hero-desc">AURA Lite consolidates three production-grade AI agents — Gemini NLP Summarizer, MCP Hybrid Crop Advisory, and AlloyDB Natural Language SQL — into a single FastAPI-orchestrated platform.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" onclick="switchPage('projects')">
+          <svg viewBox="0 0 24 24"><path d="M4 4h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 10h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4zM4 16h4v4H4zm6 0h4v4h-4zm6 0h4v4h-4z"/></svg>
+          View Modules
+        </button>
+        <button class="btn btn-ghost" onclick="switchPage('architecture')">
+          <svg viewBox="0 0 24 24"><path d="M19.3 16.9c.4-.7.7-1.5.7-2.4 0-2.5-2-4.5-4.5-4.5S11 12 11 14.5c0 .9.3 1.7.7 2.4H4c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2v9.9h-2.7z"/></svg>
+          Architecture
+        </button>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="stat-n">3</div><div class="stat-l">AI Agents</div></div>
+        <div class="stat"><div class="stat-n">GCP</div><div class="stat-l">Cloud Native</div></div>
+        <div class="stat"><div class="stat-n">MCP</div><div class="stat-l">Toolchain</div></div>
+        <div class="stat"><div class="stat-n">SQL</div><div class="stat-l">AlloyDB</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROJECTS -->
+  <div id="projects" class="page">
+    <div class="page-inner">
+      <div class="page-header">
+        <h1>Project Modules</h1>
+        <p>Three intelligent agents — pick a track to start processing data.</p>
+      </div>
+      <div class="grid">
+        <div class="card" onclick="switchPage('track1')">
+          <div class="track-tag tag-blue">Track 1</div>
+          <div class="card-chip"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
+          <h3>Google Gemini Integration</h3>
+          <p>Paste dense agricultural reports or research papers and get a concise, accurate summary generated by Gemini Flash-Lite.</p>
+        </div>
+        <div class="card" onclick="switchPage('track2')">
+          <div class="track-tag tag-green">Track 2</div>
+          <div class="card-chip" style="background:rgba(52,211,153,0.12); border-color:rgba(52,211,153,0.25); color:var(--green)"><svg viewBox="0 0 24 24"><path d="M17 5.92L9 2v18H7v-1.73c-1.79.35-3 .99-3 1.73 0 1.1 2.69 2 6 2s6-.9 6-2c0-.99-2.16-1.81-5-1.97V8.98l6-3.06z"/></svg></div>
+          <h3>Agent Development Kit (MCP)</h3>
+          <p>Hybrid agent that calls live Weather API + internal JSON DB. Falls back to Gemini when no rules match for intelligent reasoning.</p>
+        </div>
+        <div class="card" onclick="switchPage('track3')">
+          <div class="track-tag tag-amber">Track 3</div>
+          <div class="card-chip" style="background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.25); color:var(--amber)"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 4.24 2 7v10c0 2.76 4.48 5 10 5s10-2.24 10-5V7c0-2.76-4.48-5-10-5zm0 3c4.14 0 7.5 1.34 7.5 3S16.14 11 12 11 4.5 9.34 4.5 8 7.86 5 12 5zm0 15c-4.14 0-7.5-1.34-7.5-3v-2.46C6.56 16.04 9.15 17 12 17s5.44-.96 7.5-2.46V17c0 1.66-3.36 3-7.5 3z"/></svg></div>
+          <h3>AlloyDB Integration</h3>
+          <p>Ask plain-English questions. The agent writes valid PostgreSQL, executes it against AlloyDB securely, and returns formatted results.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <div id="architecture" class="page">
+    <div class="page-inner">
+      <div class="page-header">
+        <h1>System Architecture</h1>
+        <p>Live data flow between Frontend, FastAPI Orchestrator, and AI Agent tracks.</p>
+      </div>
+      <div class="arch-wrap">
+        <div class="arch-title">AURA Lite — System Data Flow</div>
+        <div class="arch-sub">Discrete Track Flows &amp; Unified Platform</div>
+        <svg class="diagram-svg" viewBox="0 0 960 820" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0 0L10 5L0 10z" fill="#38bdf8"/>
+            </marker>
+            <marker id="arr-g" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0 0L10 5L0 10z" fill="#34d399"/>
+            </marker>
+            <marker id="arr-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+              <path d="M0 0L10 5L0 10z" fill="#fbbf24"/>
+            </marker>
+          </defs>
+
+          <!-- Track panels -->
+          <rect x="20" y="20" width="280" height="390" rx="12" fill="none" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4 4" opacity="0.4"/>
+          <text x="160" y="48" text-anchor="middle" fill="#3b82f6" font-size="12" font-weight="700" letter-spacing="2" font-family="DM Sans, sans-serif">TRACK 1 · SUMMARIZER</text>
+
+          <rect x="330" y="20" width="300" height="390" rx="12" fill="none" stroke="#34d399" stroke-width="1" stroke-dasharray="4 4" opacity="0.4"/>
+          <text x="480" y="48" text-anchor="middle" fill="#34d399" font-size="12" font-weight="700" letter-spacing="2" font-family="DM Sans, sans-serif">TRACK 2 · MCP ADVISORY</text>
+
+          <rect x="660" y="20" width="280" height="390" rx="12" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4 4" opacity="0.4"/>
+          <text x="800" y="48" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="700" letter-spacing="2" font-family="DM Sans, sans-serif">TRACK 3 · ALLOYDB SQL</text>
+
+          <!-- Unified panel -->
+          <rect x="20" y="440" width="920" height="360" rx="12" fill="none" stroke="#0ea5e9" stroke-width="1.5" opacity="0.5"/>
+          <text x="480" y="468" text-anchor="middle" fill="#e8f4fd" font-size="14" font-weight="700" letter-spacing="3" font-family="DM Sans, sans-serif">UNIFIED PLATFORM</text>
+
+          <!-- TRACK 1 nodes -->
+          <rect class="node-box" x="60"  y="65"  width="200" height="44" rx="8"/>
+          <text class="node-text" x="160" y="92"  text-anchor="middle">Input Text</text>
+          <line class="flow-line" x1="160" y1="109" x2="160" y2="148"/>
+          <path class="flow-anim" d="M160 109 L160 148" marker-end="url(#arr)"/>
+
+          <rect class="node-box" x="60" y="148" width="200" height="52" rx="8" stroke="#3b82f6" stroke-opacity="0.7"/>
+          <text class="node-text" x="160" y="172" text-anchor="middle" fill="#93c5fd">Gemini</text>
+          <text class="node-sub"  x="160" y="190" text-anchor="middle">NLP Summarization</text>
+          <path class="flow-anim" d="M160 200 L160 248" marker-end="url(#arr)"/>
+
+          <rect class="node-box" x="60" y="248" width="200" height="44" rx="8"/>
+          <text class="node-text" x="160" y="275" text-anchor="middle">Summary Output</text>
+
+          <!-- TRACK 2 nodes -->
+          <rect class="node-box" x="385" y="65" width="190" height="44" rx="8"/>
+          <text class="node-text" x="480" y="92" text-anchor="middle">Location String</text>
+          <path class="flow-anim flow-anim-g" d="M480 109 L480 148" marker-end="url(#arr-g)"/>
+
+          <rect class="node-box" x="375" y="148" width="210" height="52" rx="8" stroke="#34d399" stroke-opacity="0.7"/>
+          <text class="node-text" x="480" y="172" text-anchor="middle" fill="#86efac">Farmer Agent (MCP)</text>
+          <text class="node-sub"  x="480" y="190" text-anchor="middle">Orchestrates Tool Calls</text>
+
+          <path class="flow-anim flow-anim-g" d="M380 175 C340 175 340 240 385 258" marker-end="url(#arr-g)"/>
+          <rect class="node-box" x="330" y="258" width="120" height="44" rx="8"/>
+          <text class="node-text" x="390" y="284" text-anchor="middle" font-size="12">Weather API</text>
+
+          <path class="flow-anim flow-anim-g" d="M580 175 C620 175 620 240 575 258" marker-end="url(#arr-g)"/>
+          <rect class="node-box" x="510" y="258" width="120" height="44" rx="8"/>
+          <text class="node-text" x="570" y="284" text-anchor="middle" font-size="12">Local JSON DB</text>
+
+          <path class="flow-anim flow-anim-g" d="M480 200 L480 340" marker-end="url(#arr-g)"/>
+          <rect class="node-box" x="380" y="340" width="200" height="44" rx="8"/>
+          <text class="node-text" x="480" y="367" text-anchor="middle">Crop Advisory JSON</text>
+
+          <!-- TRACK 3 nodes -->
+          <rect class="node-box" x="700" y="65" width="200" height="44" rx="8"/>
+          <text class="node-text" x="800" y="92" text-anchor="middle">Natural Language</text>
+          <path class="flow-anim flow-anim-a" d="M800 109 L800 148" marker-end="url(#arr-a)"/>
+
+          <rect class="node-box" x="700" y="148" width="200" height="52" rx="8" stroke="#fbbf24" stroke-opacity="0.7"/>
+          <text class="node-text" x="800" y="172" text-anchor="middle" fill="#fde68a">SQL Gen Agent</text>
+          <text class="node-sub"  x="800" y="190" text-anchor="middle">Converts to PostgreSQL</text>
+          <path class="flow-anim flow-anim-a" d="M800 200 L800 248" marker-end="url(#arr-a)"/>
+
+          <rect class="node-box" x="700" y="248" width="200" height="44" rx="8"/>
+          <text class="node-text" x="800" y="275" text-anchor="middle">psycopg2 Engine</text>
+          <path class="flow-anim flow-anim-a" d="M800 292 L800 340" marker-end="url(#arr-a)"/>
+
+          <rect class="node-box" x="700" y="340" width="200" height="44" rx="8"/>
+          <text class="node-text" x="800" y="367" text-anchor="middle">Table Results</text>
+
+          <!-- UNIFIED — Frontend -->
+          <rect class="node-box" x="385" y="490" width="190" height="54" rx="8" stroke="#0ea5e9" stroke-width="2"/>
+          <text class="node-text" x="480" y="515" text-anchor="middle" font-size="15">AURA Lite Frontend</text>
+          <text class="node-sub"  x="480" y="534" text-anchor="middle" fill="#38bdf8">FastAPI / HTML UI</text>
+          <path class="flow-anim" d="M480 544 L480 590" marker-end="url(#arr)"/>
+
+          <!-- FastAPI -->
+          <rect class="node-box" x="340" y="590" width="280" height="54" rx="8" stroke="#0ea5e9"/>
+          <text class="node-text" x="480" y="614" text-anchor="middle" fill="#38bdf8">FastAPI Backend · Port 8080</text>
+          <text class="node-sub"  x="480" y="634" text-anchor="middle">Central Routing & API Context</text>
+
+          <!-- Routes to endpoints -->
+          <path class="flow-anim" d="M340 617 C160 617 160 665 160 690" marker-end="url(#arr)"/>
+          <rect class="node-box" x="60"  y="690" width="200" height="44" rx="8" stroke="#3b82f6" stroke-opacity="0.7"/>
+          <text class="node-text" x="160" y="717" text-anchor="middle" fill="#93c5fd">/predict Endpoint</text>
+
+          <path class="flow-anim flow-anim-g" d="M480 644 L480 690" marker-end="url(#arr-g)"/>
+          <rect class="node-box" x="375" y="690" width="210" height="44" rx="8" stroke="#34d399" stroke-opacity="0.7"/>
+          <text class="node-text" x="480" y="717" text-anchor="middle" fill="#86efac">/crop-suggest Endpoint</text>
+
+          <path class="flow-anim flow-anim-a" d="M620 617 C800 617 800 665 800 690" marker-end="url(#arr-a)"/>
+          <rect class="node-box" x="700" y="690" width="200" height="44" rx="8" stroke="#fbbf24" stroke-opacity="0.7"/>
+          <text class="node-text" x="800" y="717" text-anchor="middle" fill="#fde68a">/query Endpoint</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRACK 1 -->
+  <div id="track1" class="page">
+    <div class="page-inner">
+      <div class="page-header">
+        <div class="track-tag tag-blue">Track 1 · Gemini</div>
+        <h1>AI Text Summarization</h1>
+        <p>Paste agricultural text to get an instant Gemini-powered summary.</p>
+      </div>
+      <div class="form-card">
+        <div class="field">
+          <label>Agricultural Document / Report</label>
+          <textarea id="t1-input" rows="6" placeholder="Paste research abstract, soil health report, or farming advisory here…"></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="runTrack1()">
+          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          Process &amp; Summarize
+        </button>
+        <div class="loader" id="t1-loader">
+          <div class="loader-dot"></div><div class="loader-dot"></div><div class="loader-dot"></div>
+        </div>
+        <div class="result-box" id="t1-result"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRACK 2 -->
+  <div id="track2" class="page">
+    <div class="page-inner">
+      <div class="page-header">
+        <div class="track-tag tag-green">Track 2 · MCP</div>
+        <h1>Farmer Advisory Agent</h1>
+        <p>Hybrid agent connecting live Weather API, static DB, and Gemini fallback.</p>
+      </div>
+      <div class="form-card">
+        <div class="field">
+          <label>Target Location</label>
+          <input type="text" id="t2-input" placeholder="e.g. Karnataka, India">
+        </div>
+        <button class="btn btn-primary" style="background:linear-gradient(135deg,#059669,#10b981); box-shadow:0 4px 18px rgba(16,185,129,0.2);" onclick="runTrack2()">
+          <svg viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+          Analyze &amp; Recommend
+        </button>
+        <div class="loader" id="t2-loader">
+          <div class="loader-dot" style="background:var(--green)"></div>
+          <div class="loader-dot" style="background:var(--green)"></div>
+          <div class="loader-dot" style="background:var(--green)"></div>
+        </div>
+        <div class="result-box" id="t2-result" style="border-color:var(--green)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRACK 3 -->
+  <div id="track3" class="page">
+    <div class="page-inner">
+      <div class="page-header">
+        <div class="track-tag tag-amber">Track 3 · AlloyDB</div>
+        <h1>AlloyDB Insight Query</h1>
+        <p>Natural language → strict SQL → executed on PostgreSQL.</p>
+      </div>
+      <div class="form-card">
+        <div class="field">
+          <label>Database Question (Natural Language)</label>
+          <input type="text" id="t3-input" placeholder="e.g. Show high profit crops for low rainfall conditions">
+        </div>
+        <button class="btn btn-primary" style="background:linear-gradient(135deg,#d97706,#fbbf24); box-shadow:0 4px 18px rgba(251,191,36,0.2); color:#0d1117;" onclick="runTrack3()">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5z"/></svg>
+          Execute AI Query
+        </button>
+        <div class="loader" id="t3-loader">
+          <div class="loader-dot" style="background:var(--amber)"></div>
+          <div class="loader-dot" style="background:var(--amber)"></div>
+          <div class="loader-dot" style="background:var(--amber)"></div>
+        </div>
+        <div class="result-box" id="t3-result" style="border-color:var(--amber)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ABOUT US -->
+  <div id="about" class="page">
+    <div class="page-inner">
+      <div class="page-header">
+        <div class="track-tag tag-blue">Contact</div>
+        <h1>About Us</h1>
+        <p>AURA Lite Intelligence Network</p>
+      </div>
+      <div class="form-card" style="text-align: center; padding: 3rem 1rem;">
+        <h2 style="margin-bottom: 1rem; color: var(--text);">AURA LITE</h2>
+        <p style="margin-bottom: 0.5rem; color: var(--muted-2);">Email: <a href="mailto:theauraailtd@gmail.com" style="color: var(--primary); text-decoration: none;">theauraailtd@gmail.com</a></p>
+        <p style="color: var(--muted-2); margin-bottom: 2rem;">Phone: <a href="tel:+917022756962" style="color: var(--primary); text-decoration: none;">+91 7022756962</a></p>
+        
+        <a href="https://www.linkedin.com/in/varshith-kumar-anand-7479b42a6" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); font-weight: 500; font-size: 1.05rem; opacity: 0.9; transition: all 0.2s;" onmouseover="this.style.opacity='1'; this.style.color='var(--primary)';" onmouseout="this.style.opacity='0.9'; this.style.color='var(--text)';">
+          <svg viewBox="0 0 24 24" width="28" height="28" style="margin-right: 8px;">
+            <rect x="4" y="4" width="16" height="16" fill="transparent" />
+            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.16-3.8c-1.1 0-1.8.6-2.1 1.2v-1h-2.3v8.9h2.3v-4.9c0-1.3.2-2.5 1.8-2.5 1.5 0 1.5 1.4 1.5 2.6v4.8h2.4M7.8 8.4V19H5.5V8.4h2.3M6.6 5.6C5.9 5.6 5.4 6 5.4 6.7s.5 1.1 1.2 1.1c.7 0 1.2-.5 1.2-1.1.1-.6-.4-1.1-1.2-1.1z" fill="#ffffff"/>
+          </svg>
+          <span style="text-decoration: underline;">Contact Developer</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="ai-disclaimer">
+    AURA LITE is AI and can make mistakes. Please double-check responses.
+  </div>
+
+</div><!-- /main -->
+
+<script>
+/* ═══════════════════════════════════════════════════
+   AURA LITE — PERFORMANCE-OPTIMISED JS
+   Rules:
+   - No blur() during animations
+   - Curtain = opacity-only overlay (GPU)
+   - isTransitioning guard prevents rapid-click stacks
+   - AbortController per track cancels stale fetches
+   - { once:true } on load listener
+   - .trim() on all inputs
+═══════════════════════════════════════════════════ */
+
+const API_BASE = "";
+
+// ── Intro ──────────────────────────────────────────
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('intro').classList.add('out');
+  }, 2800);
+}, { once: true });
+
+// ── Sidebar (desktop toggle) ────────────────────────
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+// ── Mobile drawer ───────────────────────────────────
+function openDrawer() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('drawer-overlay');
+  // Toggle — if already open, close it
+  if (sidebar.classList.contains('mobile-open')) {
+    closeDrawer();
+    return;
+  }
+  sidebar.classList.add('mobile-open');
+  overlay.classList.add('show');
+}
+function closeDrawer() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('drawer-overlay');
+  sidebar.classList.remove('mobile-open');
+  overlay.classList.remove('show');
+}
+
+// ── Navigation ─────────────────────────────────────
+let isTransitioning = false;
+
+function switchPage(pageId) {
+  if (isTransitioning) return;
+  const target = document.getElementById(pageId);
+  if (!target) return;
+  if (target.classList.contains('active')) return;
+
+  isTransitioning = true;
+
+  // Close mobile drawer if open
+  closeDrawer();
+
+  const curtain = document.getElementById('curtain');
+  const current = document.querySelector('.page.active');
+
+  curtain.classList.add('in');
+  if (current) current.classList.add('leaving');
+
+  setTimeout(() => {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active', 'leaving'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+    target.classList.add('active');
+
+    // Highlight desktop nav
+    const btn = Array.from(document.querySelectorAll('.nav-item'))
+      .find(b => b.getAttribute('onclick')?.includes(pageId));
+    if (btn) btn.classList.add('active');
+
+    // Highlight bottom nav
+    document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
+    const bnav = document.getElementById('bn-' + pageId);
+    if (bnav) bnav.classList.add('active');
+
+    // Sidebar collapse on overview only (desktop)
+    document.getElementById('sidebar').classList.toggle('collapsed', pageId === 'overview');
+
+    window.scrollTo(0, 0);
+
+    curtain.classList.remove('in');
+    curtain.classList.add('out');
+    setTimeout(() => curtain.classList.remove('out'), 280);
+
+    isTransitioning = false;
+  }, 260);
+}
+
+// ── Keyboard: Enter = submit, Shift+Enter = new line ────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // Track 1 — textarea: Enter submits, Shift+Enter = new line
+  document.getElementById('t1-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      runTrack1();
+    }
+    // Shift+Enter — default textarea behavior (new line), nothing to override
+  });
+
+  // Track 2 — single-line input: Enter submits
+  document.getElementById('t2-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runTrack2();
+    }
+  });
+
+  // Track 3 — single-line input: Enter submits
+  document.getElementById('t3-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runTrack3();
+    }
+  });
+});
+
+// ── Fetch helpers ───────────────────────────────────
+let ctrl1 = null, ctrl2 = null, ctrl3 = null;
+
+function showLoader(id)  { document.getElementById(id).classList.add('show'); }
+function hideLoader(id)  { document.getElementById(id).classList.remove('show'); }
+function showResult(id, html) {
+  const el = document.getElementById(id);
+  el.innerHTML = html;
+  el.classList.add('show');
+  el.style.display = 'block';
+}
+function hideResult(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('show');
+  el.style.display = 'none';
+}
+
+// ── Track 1 ─────────────────────────────────────────
+async function runTrack1() {
+  const text = document.getElementById('t1-input').value.trim();
+  if (!text) return;
+
+  if (ctrl1) ctrl1.abort();
+  ctrl1 = new AbortController();
+
+  hideResult('t1-result');
+  showLoader('t1-loader');
+
+  try {
+    const res  = await fetch(`${API_BASE}/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+      signal: ctrl1.signal
+    });
+    const data = await res.json();
+    showResult('t1-result',
+      `<strong>Gemini Summary</strong><br><br>
+       <span style="line-height:1.7">${data.summary}</span>`
+    );
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    showResult('t1-result',
+      `<span style="color:var(--error)">Error connecting to AI Pipeline.</span>`
+    );
+  } finally {
+    hideLoader('t1-loader');
+  }
+}
+
+// ── Track 2 ─────────────────────────────────────────
+async function runTrack2() {
+  const loc = document.getElementById('t2-input').value.trim();
+  if (!loc) return;
+
+  if (ctrl2) ctrl2.abort();
+  ctrl2 = new AbortController();
+
+  hideResult('t2-result');
+  showLoader('t2-loader');
+
+  try {
+    const res  = await fetch(`${API_BASE}/crop-suggest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ location: loc }),
+      signal: ctrl2.signal
+    });
+    const data = await res.json();
+
+    let html = `<strong>Location:</strong> <span style="color:#fff">${data.location}</span><br><br>`;
+
+    if (data.source === 'none' || data.recommended_crops?.length === 0) {
+      // Special formatting for non-arable/invalid locations
+      html += `<strong>Reasoning:</strong><br><span style="line-height:1.6">${data.reason}</span><br><br>`;
+      html += `<strong>Crop Recommendation:</strong><br><span style="color:var(--muted)">None</span><br><br>`;
+      html += `<strong>Conclusion:</strong><br><span style="line-height:1.6">This region is not suitable for farming.</span>`;
+    } else {
+      // Standard layout for successful crop recommendations
+      html += `<strong>Route:</strong> <span style="color:var(--green)">${(data.source || 'error').toUpperCase()} AGENT</span><br>`;
+      html += `<strong>Reasoning:</strong> ${data.reason}<br><br>`;
+
+      html += `<table><tr><th>Crop</th><th>Profit / Acre</th><th>Season</th></tr>`;
+      data.recommended_crops.forEach(c => {
+        html += `<tr>
+          <td style="color:#fff;font-weight:600">${c.name}</td>
+          <td style="color:var(--success)">₹${c.profit_per_acre}</td>
+          <td>${c.season}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+    }
+
+    showResult('t2-result', html);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    showResult('t2-result',
+      `<span style="color:var(--error)">MCP Server unresponsive or API failure.</span>`
+    );
+  } finally {
+    hideLoader('t2-loader');
+  }
+}
+
+// ── Track 3 ─────────────────────────────────────────
+async function runTrack3() {
+  const q = document.getElementById('t3-input').value.trim();
+  if (!q) return;
+
+  if (ctrl3) ctrl3.abort();
+  ctrl3 = new AbortController();
+
+  hideResult('t3-result');
+  showLoader('t3-loader');
+
+  try {
+    const res  = await fetch(`${API_BASE}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q }),
+      signal: ctrl3.signal
+    });
+    const data = await res.json();
+
+    let html = `<div class="sql-block">
+      <span class="sql-comment">-- Translated SQL Query</span><br>
+      ${data.query || 'None'}
+    </div>`;
+
+    if (data.status === 'error') {
+      html += `<span style="color:var(--error)"><strong>Execution Error:</strong> ${data.error}</span>`;
+    } else {
+      html += `<strong>PostgreSQL Results</strong> <span style="color:var(--muted);font-size:0.85rem">(${data.total_results} rows)</span><br>`;
+      if (data.results?.length > 0) {
+        const isObj = typeof data.results[0] === 'object';
+        if (isObj) {
+          const keys = Object.keys(data.results[0]);
+          html += `<table><tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr>`;
+          data.results.forEach(row => {
+            html += `<tr>${keys.map(k => `<td>${row[k]}</td>`).join('')}</tr>`;
+          });
+          html += `</table>`;
+        } else {
+          html += `<ul style="margin:12px 0 0 20px">${data.results.map(r => `<li>${r}</li>`).join('')}</ul>`;
+        }
+      } else {
+        html += `<em style="color:var(--muted)">Query returned 0 rows.</em>`;
+      }
+    }
+
+    showResult('t3-result', html);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    showResult('t3-result',
+      `<span style="color:var(--error)">AlloyDB connection refused or backend offline.</span>`
+    );
+  } finally {
+    hideLoader('t3-loader');
+  }
+}
+</script>
+</body>
+</html>
